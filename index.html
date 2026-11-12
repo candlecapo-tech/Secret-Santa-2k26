@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Santa Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f1e7; --card:#fffdf8; --ink:#1f2a24; --muted:#6b7068;
+    --red:#b8322a; --red-d:#8f241e; --green:#1f5c43; --line:#e4dccb; --gold:#c9962e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);
+    background-image:radial-gradient(circle at 1px 1px, rgba(31,92,67,.08) 1px, transparent 0);background-size:22px 22px;
+    min-height:100vh;padding:20px 16px 48px}
+  .wrap{max-width:520px;margin:0 auto}
+  header{text-align:center;margin:8px 0 22px}
+  .badge{display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:600;
+    border:1px solid var(--green);border-radius:99px;padding:4px 12px;margin-bottom:10px}
+  h1{font-family:Fraunces,serif;font-weight:800;font-size:38px;line-height:1.05;margin:0;color:var(--red)}
+  header p{color:var(--muted);margin:8px 0 0;font-size:15px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;
+    box-shadow:0 1px 0 rgba(0,0,0,.03),0 8px 24px -16px rgba(31,42,36,.25)}
+  h2{font-family:Fraunces,serif;font-weight:600;font-size:20px;margin:0 0 4px}
+  .hint{color:var(--muted);font-size:13.5px;margin:0 0 12px}
+  .row{display:flex;gap:8px}
+  input,select{font:inherit;font-size:16px;flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:transparent}
+  button{font:inherit;font-weight:600;font-size:15px;border:0;border-radius:12px;padding:12px 16px;cursor:pointer;
+    background:var(--green);color:#fff;transition:transform .08s, background .15s}
+  button:active{transform:scale(.97)}
+  button.red{background:var(--red)} button.red:hover{background:var(--red-d)}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button.link{background:none;color:var(--muted);padding:6px;font-weight:500;text-decoration:underline;font-size:14px}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .big{width:100%;padding:16px;font-size:17px;border-radius:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#f1ece0;border-radius:99px;padding:7px 8px 7px 14px;font-size:15px}
+  .chip button{background:none;color:var(--muted);padding:0 6px;font-size:18px;line-height:1}
+  .empty{color:var(--muted);font-size:14px;font-style:italic;margin-top:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .meta{display:grid;gap:8px}
+  .err{color:var(--red);font-size:14px;margin-top:10px;min-height:0}
+  .people{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .person{background:#fff;color:var(--ink);border:1px solid var(--line);padding:16px 10px;border-radius:14px;text-align:center;font-size:16px}
+  .person.seen{background:#eef4ef;color:var(--green);border-color:#cfe0d4}
+  .person.seen::after{content:" ✓"}
+  .overlay{position:fixed;inset:0;background:rgba(20,28,24,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+  .overlay.on{display:flex}
+  .modal{background:var(--card);border-radius:22px;padding:26px 22px;max-width:400px;width:100%;text-align:center}
+  .modal h3{font-family:Fraunces,serif;font-size:24px;margin:0 0 6px}
+  .modal p{color:var(--muted);margin:0 0 18px}
+  .gift{width:120px;height:120px;margin:4px auto 16px;cursor:pointer;transition:transform .2s}
+  .gift:hover{transform:rotate(-4deg) scale(1.04)}
+  .reveal{font-family:Fraunces,serif;font-weight:800;font-size:40px;color:var(--red);margin:6px 0 4px;word-break:break-word}
+  .small{font-size:13px;color:var(--muted)}
+  .stack{display:grid;gap:8px}
+  .pill{display:inline-block;background:#f1ece0;border-radius:8px;padding:3px 8px;font-size:13px;margin:2px}
+  .list{margin:10px 0 0;padding:0;list-style:none}
+  .list li{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--line);font-size:15px}
+  .hidden{display:none}
+  .send{align-items:center;gap:8px}
+  .send .nm{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .send .nm.sent{color:var(--green)} .send .nm.sent::after{content:" ✓ copied"; font-size:12px;font-weight:400}
+  .send button{padding:9px 12px;font-size:14px}
+  #fallback{width:100%;font-size:13px;margin-top:10px;min-height:70px;border-radius:10px;border:1px solid var(--line);padding:8px;font-family:inherit}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+  .popin{animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="badge">🎄 Gift exchange</span>
+    <h1>Secret Santa</h1>
+    <p>Add everyone, draw names, then pass the phone around.</p>
+  </header>
+
+  <!-- SETUP -->
+  <section id="setup">
+    <div class="card">
+      <h2>Who's playing?</h2>
+      <p class="hint">Add at least 3 people.</p>
+      <form id="addForm" class="row">
+        <input id="nameIn" placeholder="Name" autocomplete="off" maxlength="40">
+        <button type="submit">Add</button>
+      </form>
+      <div id="chips" class="chips"></div>
+    </div>
+
+    <div class="card">
+      <h2>Can't draw each other <span class="small">(optional)</span></h2>
+      <p class="hint">Couples or housemates who shouldn't get each other.</p>
+      <div class="grid2">
+        <select id="exA"></select>
+        <select id="exB"></select>
+      </div>
+      <button class="ghost" id="addEx" style="width:100%;margin-top:8px">Add rule</button>
+      <div id="exList" class="chips"></div>
+    </div>
+
+    <div class="card">
+      <h2>Details <span class="small">(optional)</span></h2>
+      <div class="meta">
+        <input id="budget" placeholder="Budget, e.g. $25" maxlength="40">
+        <input id="date" placeholder="Exchange date, e.g. Dec 20" maxlength="40">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Saved setups</h2>
+      <p class="hint">Save your names, rules and details, so you can do a test run and then load them for the real draw.</p>
+      <form id="saveForm" class="row">
+        <input id="cfgName" placeholder="Setup name, e.g. Family 2026" maxlength="40" autocomplete="off">
+        <button type="submit">Save</button>
+      </form>
+      <ul id="cfgList" class="list"></ul>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" id="exportBtn" style="flex:1">Copy backup code</button>
+        <button class="ghost" id="importBtn" style="flex:1">Load from code</button>
+      </div>
+      <div id="cfgMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <button id="drawBtn" class="red big">🎁 Draw names</button>
+    <div id="err" class="err"></div>
+  </section>
+
+  <!-- RECIPIENT VIEW (opened from a private link) -->
+  <section id="mine" class="hidden">
+    <div class="card" style="text-align:center;padding:28px 20px">
+      <div id="mineBody"></div>
+    </div>
+    <p class="small" style="text-align:center">Keep it secret 🤫 Don't share this link with anyone.</p>
+  </section>
+
+  <!-- SEND LINKS -->
+  <section id="results" class="hidden">
+    <div class="card">
+      <h2>Names are drawn!</h2>
+      <p class="hint">Send each person their own private link (text, email, group chat DM). The link only shows <b>their</b> match, and the matches are scrambled so you can play too — just don't open other people's links.</p>
+      <div id="infoLine" class="small" style="margin-bottom:12px"></div>
+      <ul id="sendList" class="list"></ul>
+    </div>
+    <div class="card stack">
+      <button class="ghost" id="redraw">Redraw everyone</button>
+      <button class="ghost" id="edit">Edit players</button>
+      <button class="link" id="organizer">Organizer view (shows all matches)</button>
+      <div id="orgBox" class="hidden">
+        <ul id="orgList" class="list"></ul>
+        <button class="ghost" id="copyAll" style="width:100%;margin-top:10px">Copy all matches</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="ov">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const S = { names: [], ex: [], budget:'', date:'', pairs:null, seen:{} };
+const KEY='secret-santa-v1';
+try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s) Object.assign(S,s); }catch(e){}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function renderSetup(){
+  $('chips').innerHTML = S.names.length ? S.names.map((n,i)=>
+    `<span class="chip">${esc(n)}<button aria-label="Remove ${esc(n)}" data-i="${i}">×</button></span>`).join('')
+    : '<div class="empty">No one yet.</div>';
+  $('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const n=S.names[b.dataset.i]; S.names.splice(b.dataset.i,1);
+    S.ex=S.ex.filter(p=>p[0]!==n&&p[1]!==n); save(); renderSetup();
+  });
+  const opts='<option value="">Choose…</option>'+S.names.map(n=>`<option>${esc(n)}</option>`).join('');
+  $('exA').innerHTML=opts; $('exB').innerHTML=opts;
+  $('exList').innerHTML = S.ex.map((p,i)=>
+    `<span class="chip">${esc(p[0])} ⇄ ${esc(p[1])}<button data-i="${i}" aria-label="Remove rule">×</button></span>`).join('');
+  $('exList').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.ex.splice(b.dataset.i,1);save();renderSetup();});
+  $('budget').value=S.budget; $('date').value=S.date;
+}
+
+$('addForm').onsubmit=e=>{
+  e.preventDefault();
+  const v=$('nameIn').value.trim(); $('err').textContent='';
+  if(!v) return;
+  if(S.names.some(n=>n.toLowerCase()===v.toLowerCase())){ $('err').textContent=`"${v}" is already on the list.`; return; }
+  S.names.push(v); $('nameIn').value=''; save(); renderSetup(); $('nameIn').focus();
+};
+$('addEx').onclick=()=>{
+  const a=$('exA').value,b=$('exB').value; $('err').textContent='';
+  if(!a||!b||a===b){ $('err').textContent='Pick two different people for the rule.'; return; }
+  if(S.ex.some(p=>(p[0]===a&&p[1]===b)||(p[0]===b&&p[1]===a))) return;
+  S.ex.push([a,b]); save(); renderSetup();
+};
+$('budget').oninput=e=>{S.budget=e.target.value;save();};
+$('date').oninput=e=>{S.date=e.target.value;save();};
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+// Backtracking search: each giver gets a distinct receiver, not themselves, not an excluded partner.
+function draw(names, ex){
+  const bad=new Set(); ex.forEach(([a,b])=>{bad.add(a+'\u0000'+b);bad.add(b+'\u0000'+a);});
+  const givers=shuffle(names.slice()), used=new Set(), out={};
+  let steps=0;
+  function go(i){
+    if(++steps>200000) return false;
+    if(i===givers.length) return true;
+    const g=givers[i];
+    for(const r of shuffle(names.slice())){
+      if(r===g||used.has(r)||bad.has(g+'\u0000'+r)) continue;
+      used.add(r); out[g]=r;
+      if(go(i+1)) return true;
+      used.delete(r); delete out[g];
+    }
+    return false;
+  }
+  return go(0)?out:null;
+}
+
+function doDraw(){
+  $('err').textContent='';
+  if(S.names.length<3){ $('err').textContent='Add at least 3 people to draw names.'; return; }
+  const p=draw(S.names,S.ex);
+  if(!p){ $('err').textContent='No valid draw is possible with these rules. Try removing a rule.'; return; }
+  S.pairs=p; S.seen={}; save(); show();
+}
+$('drawBtn').onclick=doDraw;
+
+// ---- Private links: scrambled token in the URL hash (letters + digits only) ----
+const BASE=/(^|\.)claude\.(ai|site)$|claudeusercontent|^$/.test(location.hostname)||location.protocol==='file:'
+  ? 'https://claude.ai/artifact/BawdpFN52vxtuhTkZqsZso'
+  : location.href.split('#')[0];
+const MASK=[83,97,110,116,97,33,77,101,114,114,121,88,109,97,115,55];
+function encode(obj){
+  const bytes=new TextEncoder().encode(JSON.stringify(obj));
+  let h=''; bytes.forEach((b,i)=>{ h+=((b ^ MASK[i%MASK.length] ^ (i*31&255))).toString(16).padStart(2,'0'); });
+  return 's'+h;
+}
+function decode(tok){
+  if(!/^s([0-9a-f]{2})+$/.test(tok)) return null;
+  const hex=tok.slice(1), bytes=new Uint8Array(hex.length/2);
+  for(let i=0;i<bytes.length;i++) bytes[i]=parseInt(hex.substr(i*2,2),16) ^ MASK[i%MASK.length] ^ (i*31&255);
+  try{ return JSON.parse(new TextDecoder().decode(bytes)); }catch(e){ return null; }
+}
+function linkFor(n){ return BASE+'#'+encode({g:n,r:S.pairs[n],b:S.budget,d:S.date}); }
+function msgFor(n){
+  return `Hi ${n}! 🎅 Secret Santa names are drawn. Open your private link to see who you're buying for (don't share it!):\n${linkFor(n)}`;
+}
+async function copy(text, btn, label){
+  let ok=false;
+  try{ await navigator.clipboard.writeText(text); ok=true; }catch(e){}
+  if(!ok){
+    modal(`<h3>Copy this</h3><p>Your browser blocked copying — press and hold to select it.</p>
+      <textarea id="fallback" readonly>${esc(text)}</textarea><button class="big" id="ok" style="margin-top:10px">Done</button>`);
+    const ta=$('fallback'); ta.focus(); ta.select(); $('ok').onclick=close;
+  } else { btn.textContent='Copied!'; setTimeout(()=>btn.textContent=label,1500); }
+  return true;
+}
+
+function show(){
+  const drawn=!!S.pairs;
+  $('setup').classList.toggle('hidden',drawn);
+  $('results').classList.toggle('hidden',!drawn);
+  if(!drawn){ renderSetup(); return; }
+  const bits=[]; if(S.budget) bits.push('Budget: '+esc(S.budget)); if(S.date) bits.push('Exchange: '+esc(S.date));
+  $('infoLine').innerHTML=bits.map(b=>`<span class="pill">${b}</span>`).join(' ');
+  $('sendList').innerHTML=S.names.map((n,i)=>`<li class="send">
+      <span class="nm ${S.seen[n]?'sent':''}">${esc(n)}</span>
+      <button class="ghost" data-k="link" data-i="${i}">Link</button>
+      <button data-k="msg" data-i="${i}">Copy message</button></li>`).join('');
+  $('sendList').querySelectorAll('button').forEach(b=>b.onclick=async()=>{
+    const n=S.names[b.dataset.i], isMsg=b.dataset.k==='msg';
+    await copy(isMsg?msgFor(n):linkFor(n), b, isMsg?'Copy message':'Link');
+    S.seen[n]=true; save(); b.closest('li').querySelector('.nm').classList.add('sent');
+  });
+  $('orgBox').classList.add('hidden');
+}
+
+function showMine(data){
+  $('setup').classList.add('hidden'); $('results').classList.add('hidden'); $('mine').classList.remove('hidden');
+  const bits=[]; if(data.b) bits.push('Budget: '+esc(data.b)); if(data.d) bits.push('Exchange: '+esc(data.d));
+  $('mineBody').innerHTML=`<span class="badge">🎄 Secret Santa</span>
+    <h2 style="font-size:26px;margin:6px 0 2px">Hi ${esc(data.g)}!</h2>
+    <p class="hint">Tap the gift to see who you're buying for.</p>${giftSVG}`;
+  $('mineBody').querySelector('.gift').onclick=()=>{
+    $('mineBody').innerHTML=`<p style="margin:0">${esc(data.g)}, you're Secret Santa for</p>
+      <div class="reveal popin">${esc(data.r)}</div>
+      <div style="margin-top:10px">${bits.map(b=>`<span class="pill">${b}</span>`).join(' ')}</div>`;
+  };
+}
+
+const giftSVG=`<svg class="gift" viewBox="0 0 120 120" aria-hidden="true">
+  <rect x="14" y="48" width="92" height="62" rx="6" fill="#b8322a"/>
+  <rect x="8" y="34" width="104" height="20" rx="5" fill="#8f241e"/>
+  <rect x="53" y="34" width="14" height="76" fill="#c9962e"/>
+  <path d="M60 34 C40 10, 22 22, 34 32 C40 36, 52 35, 60 34Z" fill="#c9962e"/>
+  <path d="M60 34 C80 10, 98 22, 86 32 C80 36, 68 35, 60 34Z" fill="#c9962e"/>
+</svg>`;
+
+function modal(html){ $('modal').innerHTML=html; $('ov').classList.add('on'); }
+function close(){ $('ov').classList.remove('on'); $('modal').innerHTML=''; }
+
+function askReveal(n){
+  const again=S.seen[n];
+  modal(`<h3>Are you ${esc(n)}?</h3>
+    <p>${again?'You already looked once. Make sure no one else is peeking!':'Make sure no one else can see the screen.'}</p>
+    <div class="stack"><button class="red big" id="yes">Yes, it's me</button><button class="ghost" id="no">Not me</button></div>`);
+  $('yes').onclick=()=>gift(n); $('no').onclick=close;
+}
+function gift(n){
+  modal(`<h3>${esc(n)}, tap the gift</h3>${giftSVG}<p class="small">Tap to open</p>`);
+  $('modal').querySelector('.gift').onclick=()=>reveal(n);
+}
+function reveal(n){
+  const bits=[]; if(S.budget) bits.push('Budget: '+esc(S.budget)); if(S.date) bits.push('Exchange: '+esc(S.date));
+  modal(`<p style="margin:0">You're Secret Santa for</p>
+    <div class="reveal popin">${esc(S.pairs[n])}</div>
+    <p class="small">${bits.join(' · ')||'Keep it secret! 🤫'}</p>
+    <button class="big" id="done">Got it — hide &amp; pass it on</button>`);
+  $('done').onclick=()=>{ S.seen[n]=true; save(); close(); show(); };
+}
+
+$('redraw').onclick=()=>{
+  modal(`<h3>Redraw everyone?</h3><p>All current matches will be replaced, and links you already sent will be out of date. You'll need to send everyone new links.</p>
+    <div class="stack"><button class="red big" id="y">Redraw</button><button class="ghost" id="n">Cancel</button></div>`);
+  $('y').onclick=()=>{ close(); doDraw(); }; $('n').onclick=close;
+};
+$('edit').onclick=()=>{
+  modal(`<h3>Edit players?</h3><p>This clears the current draw so you can change names or rules.</p>
+    <div class="stack"><button class="red big" id="y">Edit</button><button class="ghost" id="n">Cancel</button></div>`);
+  $('y').onclick=()=>{ S.pairs=null; S.seen={}; save(); close(); show(); }; $('n').onclick=close;
+};
+$('organizer').onclick=()=>{
+  const box=$('orgBox');
+  if(!box.classList.contains('hidden')){ box.classList.add('hidden'); return; }
+  modal(`<h3>Spoil the surprise?</h3><p>This shows every match on screen. Best for an organizer who isn't playing.</p>
+    <div class="stack"><button class="red big" id="y">Show all</button><button class="ghost" id="n">Cancel</button></div>`);
+  $('y').onclick=()=>{ close();
+    $('orgList').innerHTML=S.names.map(n=>`<li><span>${esc(n)}</span><span>→ <b>${esc(S.pairs[n])}</b></span></li>`).join('');
+    box.classList.remove('hidden'); };
+  $('n').onclick=close;
+};
+$('copyAll').onclick=async()=>{
+  const t=S.names.map(n=>`${n} → ${S.pairs[n]}`).join('\n');
+  try{ await navigator.clipboard.writeText(t); $('copyAll').textContent='Copied!'; }
+  catch(e){ $('copyAll').textContent='Copy blocked — select the list above'; }
+  setTimeout(()=>$('copyAll').textContent='Copy all matches',1800);
+};
+$('ov').onclick=e=>{ if(e.target.id==='ov') close(); };
+
+// ---- Saved setups ----
+const CFG='secret-santa-setups-v1';
+function getCfgs(){ try{ return JSON.parse(localStorage.getItem(CFG)||'[]'); }catch(e){ return []; } }
+function setCfgs(c){ try{ localStorage.setItem(CFG, JSON.stringify(c)); return true; }catch(e){ return false; } }
+const snapshot=()=>({names:S.names.slice(), ex:S.ex.map(p=>p.slice()), budget:S.budget, date:S.date});
+function msg(t){ $('cfgMsg').textContent=t; clearTimeout(msg.t); msg.t=setTimeout(()=>$('cfgMsg').textContent='',3000); }
+function applyCfg(c){
+  S.names=(c.names||[]).slice(); S.ex=(c.ex||[]).map(p=>p.slice()); S.budget=c.budget||''; S.date=c.date||'';
+  S.pairs=null; S.seen={}; save(); show();
+}
+function renderCfgs(){
+  const c=getCfgs();
+  $('cfgList').innerHTML = c.length ? c.map((x,i)=>`<li style="align-items:center;gap:8px">
+      <span style="flex:1;min-width:0"><b>${esc(x.title)}</b><br><span class="small">${x.names.length} people · ${x.ex.length} rule${x.ex.length===1?'':'s'}</span></span>
+      <button data-a="load" data-i="${i}" style="padding:8px 12px;font-size:14px">Load</button>
+      <button class="ghost" data-a="del" data-i="${i}" style="padding:8px 10px;font-size:14px" aria-label="Delete">✕</button></li>`).join('')
+    : '<li class="empty" style="border:0">No saved setups yet.</li>';
+  $('cfgList').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const all=getCfgs(), x=all[b.dataset.i];
+    if(b.dataset.a==='load'){ applyCfg(x); msg(`Loaded "${x.title}".`); }
+    else {
+      modal(`<h3>Delete "${esc(x.title)}"?</h3><p>This removes the saved setup. Your current list isn't changed.</p>
+        <div class="stack"><button class="red big" id="y">Delete</button><button class="ghost" id="n">Cancel</button></div>`);
+      $('y').onclick=()=>{ all.splice(b.dataset.i,1); setCfgs(all); close(); renderCfgs(); }; $('n').onclick=close;
+    }
+  });
+}
+$('saveForm').onsubmit=e=>{
+  e.preventDefault();
+  const t=$('cfgName').value.trim()||'My setup';
+  if(!S.names.length){ msg('Add some names first.'); return; }
+  const all=getCfgs(), i=all.findIndex(x=>x.title.toLowerCase()===t.toLowerCase());
+  const entry={title:t, ...snapshot()};
+  if(i>=0) all[i]=entry; else all.push(entry);
+  if(!setCfgs(all)){ msg('This browser blocked saving. Use "Copy backup code" instead.'); return; }
+  $('cfgName').value=''; renderCfgs(); msg(i>=0?`Updated "${t}".`:`Saved "${t}".`);
+};
+$('exportBtn').onclick=async()=>{
+  if(!S.names.length){ msg('Add some names first.'); return; }
+  await copy(encode(snapshot()), $('exportBtn'), 'Copy backup code');
+};
+$('importBtn').onclick=()=>{
+  modal(`<h3>Load from code</h3><p>Paste a backup code. It replaces the current names and rules.</p>
+    <textarea id="fallback" placeholder="Paste code here"></textarea>
+    <div class="stack" style="margin-top:10px"><button class="big" id="y">Load</button><button class="ghost" id="n">Cancel</button></div>`);
+  $('n').onclick=close;
+  $('y').onclick=()=>{
+    const c=decode($('fallback').value.trim().replace(/^#/,''));
+    if(!c||!Array.isArray(c.names)){ $('fallback').style.borderColor='var(--red)'; return; }
+    close(); applyCfg(c); msg('Setup loaded from code.');
+  };
+};
+const _renderSetup=renderSetup; renderSetup=function(){ _renderSetup(); renderCfgs(); };
+
+const tok=(location.hash||'').slice(1);
+const mine=tok?decode(tok):null;
+if(mine && mine.g && mine.r) showMine(mine); else show();
+</script>
+</body>
+</html>
