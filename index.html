@@ -147,6 +147,19 @@
         <button class="red big" id="copyGroupMsg">Copy group message</button>
         <button class="ghost" id="copyGroupLink">Copy link only</button>
       </div>
+      <div id="ghBox" class="hidden" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)">
+        <h2 style="font-size:18px">Your permanent link</h2>
+        <p class="hint" id="ghStatus">Publish this draw so your site link shows it. The link never changes, even when you redraw.</p>
+        <div id="ghTokenRow" class="stack hidden">
+          <input id="ghToken" type="password" placeholder="Paste your GitHub token" autocomplete="off">
+          <button class="ghost" id="ghSaveToken">Save token on this phone</button>
+        </div>
+        <div class="stack" style="margin-top:8px">
+          <button class="red big" id="ghPublish">📤 Publish draw to my site</button>
+          <button class="ghost" id="ghCopy">Copy site link</button>
+          <button class="link" id="ghForget">Forget saved token</button>
+        </div>
+      </div>
       <details style="margin-top:14px">
         <summary class="small" style="cursor:pointer">Or send individual links instead</summary>
         <ul id="sendList" class="list"></ul>
@@ -485,11 +498,99 @@ function showGroup(data, tok){
   } else ask();
 }
 
-const tok=(location.hash||'').slice(1);
-const mine=tok?decode(tok):null;
-if(mine && Array.isArray(mine.n) && Array.isArray(mine.t)) showGroup(mine, tok);
-else if(mine && mine.g && mine.r) showMine(mine);
-else show();
+// ---- Permanent site link: the current draw lives in draw.json in the GitHub repo ----
+const REPO='candlecapo-tech/Secret-Santa-2k26';
+const IS_GH=/\.github\.io$/.test(location.hostname);
+const SITE=IS_GH ? location.origin+location.pathname : 'https://candlecapo-tech.github.io/Secret-Santa-2k26/';
+const API=`https://api.github.com/repos/${REPO}/contents/draw.json`;
+const TKEY='ss-gh-token';
+const getTok=()=>{ try{ return localStorage.getItem(TKEY)||''; }catch(e){ return ''; } };
+
+async function loadPublished(){
+  const r=await fetch(API+'?ref=main&t='+Date.now(), {cache:'no-store'});
+  if(r.status===404) return {none:true};
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const j=await r.json();
+  const txt=atob(j.content.replace(/\s/g,''));
+  const code=JSON.parse(txt).code;
+  const data=decode(code);
+  if(!data||!Array.isArray(data.n)) return {none:true};
+  return {data, code};
+}
+async function publishDraw(){
+  const token=getTok();
+  if(!token){ $('ghTokenRow').classList.remove('hidden'); $('ghStatus').textContent='First, paste your GitHub token below (one time only).'; return; }
+  const btn=$('ghPublish'); btn.disabled=true; btn.textContent='Publishing…';
+  const code=encode({n:S.names, t:S.names.map(n=>S.names.indexOf(S.pairs[n])), b:S.budget, d:S.date, at:Date.now()});
+  const headers={Authorization:'Bearer '+token, Accept:'application/vnd.github+json'};
+  try{
+    let sha;
+    const cur=await fetch(API+'?ref=main&t='+Date.now(), {headers, cache:'no-store'});
+    if(cur.ok) sha=(await cur.json()).sha;
+    else if(cur.status!==404) throw new Error(cur.status===401?'token':'HTTP '+cur.status);
+    const body={message:'Update Secret Santa draw', content:btoa(JSON.stringify({code})), branch:'main'};
+    if(sha) body.sha=sha;
+    const put=await fetch(API, {method:'PUT', headers, body:JSON.stringify(body)});
+    if(!put.ok) throw new Error(put.status===401||put.status===403?'token':'HTTP '+put.status);
+    S.published=true; save();
+    $('ghStatus').innerHTML='✅ Published! Everyone using your site link now gets <b>this</b> draw. Anyone who rolled before needs to roll again.';
+  }catch(e){
+    $('ghStatus').textContent = e.message==='token'
+      ? '❌ GitHub rejected the token. Make sure it has Contents: Read and write for this repo, then paste it again.'
+      : '❌ Couldn\'t publish ('+e.message+'). Check your connection and try again.';
+    if(e.message==='token') $('ghTokenRow').classList.remove('hidden');
+  }
+  btn.disabled=false; btn.textContent='📤 Publish draw to my site';
+}
+$('ghPublish').onclick=publishDraw;
+$('ghSaveToken').onclick=()=>{
+  const v=$('ghToken').value.trim(); if(!v) return;
+  try{ localStorage.setItem(TKEY,v); }catch(e){}
+  $('ghToken').value=''; $('ghTokenRow').classList.add('hidden');
+  $('ghStatus').textContent='Token saved on this phone. Now tap Publish.';
+};
+$('ghForget').onclick=()=>{ try{ localStorage.removeItem(TKEY); }catch(e){} $('ghStatus').textContent='Token removed from this phone.'; };
+$('ghCopy').onclick=()=>copy(`🎅 Secret Santa time! Open this link, type your name, and roll to find out who you're buying for. Keep it secret!\n${SITE}`, $('ghCopy'), 'Copy site link');
+
+// When a new draw happens, it isn't live until published.
+const _doDraw=doDraw; doDraw=function(){ S.published=false; _doDraw(); };
+$('drawBtn').onclick=()=>doDraw();
+const _show=show; show=function(){
+  _show();
+  if(IS_GH && S.pairs){
+    $('ghBox').classList.remove('hidden');
+    $('ghStatus').innerHTML = S.published
+      ? '✅ This draw is live on your site link.'
+      : '⚠️ This draw is <b>not live yet</b>. Tap Publish so your site link uses it. The link itself never changes.';
+  }
+};
+
+function organizerFooter(){
+  const p=document.createElement('p'); p.style.textAlign='center';
+  p.innerHTML='<a href="#organizer" class="small" style="color:var(--muted)">Organizer</a>';
+  $('mine').appendChild(p);
+}
+window.addEventListener('hashchange',()=>location.reload());
+
+(async function start(){
+  const tok=(location.hash||'').slice(1);
+  const mine=tok&&tok!=='organizer'?decode(tok):null;
+  if(mine && Array.isArray(mine.n) && Array.isArray(mine.t)) return showGroup(mine, tok);
+  if(mine && mine.g && mine.r) return showMine(mine);
+  if(IS_GH && tok!=='organizer'){
+    $('setup').classList.add('hidden'); $('mine').classList.remove('hidden');
+    $('mineBody').innerHTML='<p class="hint">Loading…</p>';
+    try{
+      const res=await loadPublished();
+      if(res.data){ showGroup(res.data, res.code); organizerFooter(); return; }
+      $('mine').classList.add('hidden');
+    }catch(e){
+      $('mineBody').innerHTML='<h2>Couldn\'t load the draw</h2><p class="hint">Check your connection and refresh the page.</p>';
+      organizerFooter(); return;
+    }
+  }
+  show();
+})();
 </script>
 </body>
 </html>
