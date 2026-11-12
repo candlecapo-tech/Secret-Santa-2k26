@@ -134,16 +134,23 @@
     <div class="card" style="text-align:center;padding:28px 20px">
       <div id="mineBody"></div>
     </div>
-    <p class="small" style="text-align:center">Keep it secret 🤫 Don't share this link with anyone.</p>
+    <p class="small" style="text-align:center">Keep your match secret 🤫</p>
   </section>
 
   <!-- SEND LINKS -->
   <section id="results" class="hidden">
     <div class="card">
       <h2>Names are drawn!</h2>
-      <p class="hint">Send each person their own private link (text, email, group chat DM). The link only shows <b>their</b> match, and the matches are scrambled so you can play too — just don't open other people's links.</p>
+      <p class="hint">Send this <b>one link</b> to everyone, for example in the group chat. Each person types their name and rolls. The matches are already locked in, so nobody can be rolled twice.</p>
       <div id="infoLine" class="small" style="margin-bottom:12px"></div>
-      <ul id="sendList" class="list"></ul>
+      <div class="stack">
+        <button class="red big" id="copyGroupMsg">Copy group message</button>
+        <button class="ghost" id="copyGroupLink">Copy link only</button>
+      </div>
+      <details style="margin-top:14px">
+        <summary class="small" style="cursor:pointer">Or send individual links instead</summary>
+        <ul id="sendList" class="list"></ul>
+      </details>
     </div>
     <div class="card stack">
       <button class="ghost" id="redraw">Redraw everyone</button>
@@ -264,6 +271,16 @@ async function copy(text, btn, label){
   } else { btn.textContent='Copied!'; setTimeout(()=>btn.textContent=label,1500); }
   return true;
 }
+
+function groupLink(){
+  return BASE+'#'+encode({n:S.names, t:S.names.map(n=>S.names.indexOf(S.pairs[n])), b:S.budget, d:S.date});
+}
+function groupMsg(){
+  return `🎅 Secret Santa time! Open this link, type your name, and roll to find out who you're buying for. Keep it secret!`
+    +(S.budget?`\nBudget: ${S.budget}`:'')+(S.date?`\nExchange: ${S.date}`:'')+`\n${groupLink()}`;
+}
+$('copyGroupMsg').onclick=()=>copy(groupMsg(), $('copyGroupMsg'), 'Copy group message');
+$('copyGroupLink').onclick=()=>copy(groupLink(), $('copyGroupLink'), 'Copy link only');
 
 function show(){
   const drawn=!!S.pairs;
@@ -410,9 +427,69 @@ $('importBtn').onclick=()=>{
 };
 const _renderSetup=renderSetup; renderSetup=function(){ _renderSetup(); renderCfgs(); };
 
+// ---- Group link: type your name, roll, land on your pre-drawn match ----
+function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(36); }
+function showGroup(data, tok){
+  $('setup').classList.add('hidden'); $('results').classList.add('hidden'); $('mine').classList.remove('hidden');
+  const key='ss-rolled-'+hashStr(tok);
+  let rolled=null; try{ rolled=localStorage.getItem(key); }catch(e){}
+  const bits=[]; if(data.b) bits.push('Budget: '+esc(data.b)); if(data.d) bits.push('Exchange: '+esc(data.d));
+  const pills=bits.map(b=>`<span class="pill">${b}</span>`).join(' ');
+  const find=v=>data.n.findIndex(n=>n.trim().toLowerCase()===v.trim().toLowerCase());
+
+  function result(i, animate){
+    const me=data.n[i], target=data.n[data.t[i]];
+    $('mineBody').innerHTML=`<p style="margin:0">${esc(me)}, you're Secret Santa for</p>
+      <div class="reveal ${animate?'popin':''}">${esc(target)}</div>
+      <div style="margin-top:10px">${pills}</div>`;
+  }
+  function roll(i){
+    try{ localStorage.setItem(key, String(i)); }catch(e){}
+    const me=data.n[i], target=data.n[data.t[i]];
+    const pool=data.n.filter(n=>n!==me);
+    $('mineBody').innerHTML=`<p style="margin:0">${esc(me)}, rolling…</p><div class="reveal" id="spin">?</div>`;
+    let k=0, delay=50; const total=22;
+    (function tick(){
+      if(k>=total){ result(i,true); return; }
+      $('spin').textContent=pool[Math.floor(Math.random()*pool.length)];
+      k++; delay*=1.12; setTimeout(tick, delay);
+    })();
+  }
+  function ask(errMsg){
+    $('mineBody').innerHTML=`<span class="badge">🎄 Secret Santa</span>
+      <h2 style="font-size:26px;margin:6px 0 2px">Who are you?</h2>
+      <p class="hint">Type your name the way the organizer wrote it, then roll.</p>
+      <form id="rollForm" class="stack">
+        <input id="who" placeholder="Your name" autocomplete="off" maxlength="40">
+        <button class="red big" type="submit">🎲 Roll</button>
+      </form>
+      <div class="err" id="rollErr">${errMsg||''}</div>
+      ${pills?`<div style="margin-top:12px">${pills}</div>`:''}`;
+    $('rollForm').onsubmit=e=>{
+      e.preventDefault();
+      const v=$('who').value; if(!v.trim()) return;
+      const i=find(v);
+      if(i<0){ $('rollErr').textContent=`"${v.trim()}" isn't on the list. Check the spelling, or ask the organizer how they wrote it.`; return; }
+      if(rolled!==null && +rolled!==i){
+        $('rollErr').textContent=`This phone already rolled as ${data.n[+rolled]}. Each person should roll on their own phone.`; return;
+      }
+      roll(i);
+    };
+  }
+  if(rolled!==null && data.n[+rolled]!==undefined){
+    $('mineBody').innerHTML=`<span class="badge">🎄 Secret Santa</span>
+      <h2 style="font-size:24px;margin:6px 0 2px">You already rolled</h2>
+      <p class="hint">This phone rolled as <b>${esc(data.n[+rolled])}</b>.</p>
+      <button class="big" id="again">Show my match again</button>`;
+    $('again').onclick=()=>result(+rolled,true);
+  } else ask();
+}
+
 const tok=(location.hash||'').slice(1);
 const mine=tok?decode(tok):null;
-if(mine && mine.g && mine.r) showMine(mine); else show();
+if(mine && Array.isArray(mine.n) && Array.isArray(mine.t)) showGroup(mine, tok);
+else if(mine && mine.g && mine.r) showMine(mine);
+else show();
 </script>
 </body>
 </html>
